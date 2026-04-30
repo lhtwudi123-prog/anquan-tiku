@@ -73,7 +73,11 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f
 
 .header { background: #1a6fc4; color: #fff; padding: 16px 24px; font-size: 20px; font-weight: bold; }
 
-.container { max-width: 800px; margin: 24px auto; padding: 0 16px; }
+.container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+.exam-layout { display: grid; grid-template-columns: 340px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 768px) {
+  .exam-layout { grid-template-columns: 1fr; }
+}
 
 .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 16px; }
 
@@ -165,17 +169,33 @@ h2 { font-size: 17px; margin-bottom: 16px; color: #1a6fc4; }
 /* 多选提示 */
 .multi-hint { font-size: 13px; color: #888; margin-bottom: 12px; }
 
-/* 题号网格 */
-.nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+/* 答题卡侧栏 */
+.sidebar-title { font-size: 14px; color: #444; text-align: center; margin-bottom: 14px; }
+.sidebar-title b { color: #1a6fc4; }
+.legend { display: flex; gap: 18px; justify-content: center; margin-bottom: 16px;
+  padding-bottom: 14px; border-bottom: 1px solid #eef1f5; flex-wrap: wrap; font-size: 13px; color: #888; }
+.legend .item { display: flex; align-items: center; gap: 6px; }
+.legend .num { display: inline-flex; width: 26px; height: 26px; border-radius: 4px;
+  border: 1.5px solid #d8dde3; align-items: center; justify-content: center; font-size: 12px; color: #888; }
+.legend .num.cur { border-color: #1a6fc4; color: #1a6fc4; font-weight: bold; }
+.legend .num.ok { border-color: #27ae60; color: #fff; background: #27ae60; }
+.legend .num.bad { border-color: #e74c3c; color: #fff; background: #e74c3c; }
+.section-tag { display: inline-block; background: #1a6fc4; color: #fff; padding: 6px 14px;
+  border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+.nav-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .nav-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-  border: 1.5px solid #d0dce8; border-radius: 6px; font-size: 13px; cursor: pointer;
-  background: #f7f9fc; color: #666; transition: all .15s; user-select: none; }
-.nav-cell:hover { transform: scale(1.05); }
+  border: 1.5px solid #d8dde3; border-radius: 4px; font-size: 13px; cursor: pointer;
+  background: #fff; color: #888; transition: all .15s; user-select: none; }
+.nav-cell:hover { border-color: #1a6fc4; }
 .nav-cell.correct { background: #27ae60; color: #fff; border-color: #27ae60; }
 .nav-cell.wrong { background: #e74c3c; color: #fff; border-color: #e74c3c; }
-.nav-cell.current { box-shadow: 0 0 0 2px #1a6fc4; border-color: #1a6fc4; font-weight: bold; }
-.nav-toggle { font-size: 13px; color: #1a6fc4; cursor: pointer; user-select: none; margin-bottom: 10px; }
-.nav-card { transition: max-height .25s; }
+.nav-cell.current { border-color: #1a6fc4; color: #1a6fc4; font-weight: bold; }
+.nav-cell.current.correct, .nav-cell.current.wrong { color: #fff; box-shadow: 0 0 0 2px #1a6fc4; }
+.sidebar-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef1f5;
+  display: flex; gap: 8px; }
+.sidebar-actions button { flex: 1; padding: 9px; border-radius: 6px; border: 1px solid #1a6fc4;
+  background: #fff; color: #1a6fc4; cursor: pointer; font-size: 13px; }
+.sidebar-actions button:hover { background: #eaf2ff; }
 .redo-btn { margin-top: 10px; padding: 8px 14px; background: #fff; color: #1a6fc4;
   border: 1px solid #1a6fc4; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .redo-btn:hover { background: #eaf2ff; }
@@ -388,55 +408,53 @@ function renderQuestion() {
     if (i === currentIdx) cls += ' current';
     gridHtml += `<div class="${cls}" onclick="jumpTo(${i})">${i+1}</div>`;
   }
+  const doneCount = correctCount + wrongCount;
 
   render(`
-    <div class="card">
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-text">
-        <span>第 ${currentIdx+1} / ${total} 题</span>
-        <span class="score-badge">✓ ${correctCount} &nbsp; ✗ ${wrongCount}</span>
-      </div>
-      <div class="nav-toggle" onclick="toggleNav()" id="navToggle">▲ 收起题号导航</div>
-      <div id="navGrid" style="display:block"><div class="nav-grid">${gridHtml}</div>
-        <div style="margin-top:10px; text-align:right;">
-          <button class="redo-btn" onclick="showResult()">查看本次成绩</button>
-          <button class="restart-btn" style="padding:8px 14px; font-size:13px; margin-left:6px;" onclick="showHome()">返回首页</button>
+    <div class="exam-layout">
+      <div class="card">
+        <div class="sidebar-title">共 <b>${total}</b> 题，已答 <b>${doneCount}</b> 题</div>
+        <div class="legend">
+          <div class="item"><span class="num cur">${currentIdx+1}</span>当前</div>
+          <div class="item"><span class="num ok">✓</span>正确 ${correctCount}</div>
+          <div class="item"><span class="num bad">✗</span>错误 ${wrongCount}</div>
+        </div>
+        <div class="section-tag">${typeName}（${total}题）</div>
+        <div class="nav-grid">${gridHtml}</div>
+        <div class="sidebar-actions">
+          <button onclick="showResult()">查看成绩</button>
+          <button onclick="showHome()">返回首页</button>
         </div>
       </div>
-    </div>
-    <div class="card">
-      <div class="question-type">${typeName}</div>
-      <div class="question-text">${t.topicName}</div>
-      ${multiHint}
-      ${optionsHtml}
-      ${multiBtn}
-      <div class="result-box" id="resultBox"></div>
-      <div class="analysis-box" id="analysisBox">
-        <div class="label">解析</div>
-        <div id="analysisText"></div>
+      <div class="card">
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-text" style="margin-bottom:16px;">
+          <span>第 ${currentIdx+1} / ${total} 题</span>
+          <span class="score-badge">✓ ${correctCount} &nbsp; ✗ ${wrongCount}</span>
+        </div>
+        <div class="question-type">${typeName}</div>
+        <div class="question-text">${currentIdx+1}. ${t.topicName}</div>
+        ${multiHint}
+        ${optionsHtml}
+        ${multiBtn}
+        <div class="result-box" id="resultBox"></div>
+        <div class="analysis-box" id="analysisBox">
+          <div class="label">解析</div>
+          <div id="analysisText"></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="next-btn" style="flex:1; margin-top:0; display:${currentIdx > 0 ? 'block' : 'none'}; background:#fff; color:#1a6fc4; border:1px solid #1a6fc4;" onclick="prevQuestion()">← 上一题</button>
+          <button class="next-btn" id="nextBtn" style="flex:2; margin-top:0; display:block;" onclick="nextQuestion()">
+            ${currentIdx + 1 < total ? '下一题 →' : '查看成绩'}
+          </button>
+        </div>
       </div>
-      <button class="next-btn" id="nextBtn" onclick="nextQuestion()">
-        ${currentIdx + 1 < total ? '下一题 →' : '查看成绩'}
-      </button>
     </div>
   `);
 
   // 如果这题已答过，重放结果（锁定状态）
   if (answerStatus[currentIdx]) {
     replayAnswer();
-  }
-}
-
-function toggleNav() {
-  const grid = document.getElementById('navGrid');
-  const tog = document.getElementById('navToggle');
-  if (!grid || !tog) return;
-  if (grid.style.display === 'none') {
-    grid.style.display = 'block';
-    tog.textContent = '▲ 收起题号导航';
-  } else {
-    grid.style.display = 'none';
-    tog.textContent = '▼ 展开题号导航';
   }
 }
 
@@ -512,17 +530,8 @@ function checkAnswer(userAnswer) {
     if (practiceMode === 'normal') addWrong(currentTopic, curTid);
   }
 
-  showResultUI(userAnswer, isCorrect);
-
-  // 更新顶部进度网格中当前格子的颜色
-  const cell = document.querySelectorAll('.nav-cell')[currentIdx];
-  if (cell) {
-    cell.classList.remove('correct', 'wrong');
-    cell.classList.add(isCorrect ? 'correct' : 'wrong');
-  }
-  // 更新分数
-  const badge = document.querySelector('.score-badge');
-  if (badge) badge.innerHTML = `✓ ${correctCount} &nbsp; ✗ ${wrongCount}`;
+  // 重新渲染整个题目以同步侧边栏状态，再回放结果UI
+  renderQuestion();
 }
 
 function showResultUI(userAnswer, isCorrect) {
@@ -612,6 +621,10 @@ function markMastered(topicId) {
 function nextQuestion() {
   currentIdx++;
   loadQuestion();
+}
+
+function prevQuestion() {
+  if (currentIdx > 0) { currentIdx--; loadQuestion(); }
 }
 
 function showResult() {
