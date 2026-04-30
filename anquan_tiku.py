@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 安管人员题库练习工具 - 做完一题立即显示答案
@@ -204,15 +203,16 @@ function getWrongList() {
 function setWrongList(list) {
   localStorage.setItem(WRONG_KEY, JSON.stringify(list));
 }
-function addWrong(topicData) {
+function addWrong(topicData, tid) {
   const list = getWrongList();
-  const tid = topicData.topic.topicId;
-  if (list.some(x => x.topic.topicId === tid)) return;
-  list.push({ topic: topicData.topic, option: topicData.option || [], _addedAt: Date.now() });
+  const key = String(tid);
+  if (list.some(x => String(x._tid) === key)) return;
+  list.push({ _tid: key, topic: topicData.topic, option: topicData.option || [], _addedAt: Date.now() });
   setWrongList(list);
 }
 function removeWrong(topicId) {
-  setWrongList(getWrongList().filter(x => String(x.topic.topicId) !== String(topicId)));
+  const key = String(topicId);
+  setWrongList(getWrongList().filter(x => String(x._tid) !== key));
 }
 
 function render(html) {
@@ -260,7 +260,7 @@ function startWrongBook() {
   }
   practiceMode = 'wrong';
   wrongQueue = list.slice();
-  topicIds = wrongQueue.map(x => x.topic.topicId);
+  topicIds = wrongQueue.map(x => x._tid);
   currentIdx = 0; correctCount = 0; wrongCount = 0;
   loadQuestion();
 }
@@ -416,17 +416,18 @@ function checkAnswer(userAnswer) {
   const correctSorted = correctAnswer.split('').sort().join('');
   const isCorrect = userSorted === correctSorted;
 
+  const curTid = topicIds[currentIdx];
   if (isCorrect) {
     correctCount++;
     // 错题本模式：答对了自动从错题本移除
     if (practiceMode === 'wrong') {
-      removeWrong(currentTopic.topic.topicId);
+      removeWrong(curTid);
     }
   } else {
     wrongCount++;
     // 普通模式：答错的题加入错题本
     if (practiceMode === 'normal') {
-      addWrong(currentTopic);
+      addWrong(currentTopic, curTid);
     }
   }
 
@@ -494,7 +495,7 @@ function checkAnswer(userAnswer) {
 
   // 错题本模式：在结果框旁加一个"已掌握，移除"按钮
   if (practiceMode === 'wrong' && resultBox) {
-    const tid = currentTopic.topic.topicId;
+    const tid = topicIds[currentIdx];
     resultBox.innerHTML += `<br><button class="remove-wrong-btn" onclick="markMastered('${tid}')">已掌握，从错题本移除</button>`;
   }
 }
