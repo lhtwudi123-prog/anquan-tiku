@@ -165,6 +165,21 @@ h2 { font-size: 17px; margin-bottom: 16px; color: #1a6fc4; }
 /* 多选提示 */
 .multi-hint { font-size: 13px; color: #888; margin-bottom: 12px; }
 
+/* 题号网格 */
+.nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+.nav-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #d0dce8; border-radius: 6px; font-size: 13px; cursor: pointer;
+  background: #f7f9fc; color: #666; transition: all .15s; user-select: none; }
+.nav-cell:hover { transform: scale(1.05); }
+.nav-cell.correct { background: #27ae60; color: #fff; border-color: #27ae60; }
+.nav-cell.wrong { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+.nav-cell.current { box-shadow: 0 0 0 2px #1a6fc4; border-color: #1a6fc4; font-weight: bold; }
+.nav-toggle { font-size: 13px; color: #1a6fc4; cursor: pointer; user-select: none; margin-bottom: 10px; }
+.nav-card { transition: max-height .25s; }
+.redo-btn { margin-top: 10px; padding: 8px 14px; background: #fff; color: #1a6fc4;
+  border: 1px solid #1a6fc4; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.redo-btn:hover { background: #eaf2ff; }
+
 /* 错题本 */
 .mode-btn .tag.red { background: #e74c3c; }
 .wrong-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
@@ -194,6 +209,20 @@ let wrongCount = 0;
 let selectedAnswers = [];
 let practiceMode = 'normal'; // 'normal' or 'wrong'
 let wrongQueue = []; // 错题本模式下使用的完整题目数据数组
+let answerStatus = []; // 每题状态：{userAnswer, isCorrect} 或 undefined
+let topicCache = []; // 每题完整数据缓存，跳转时无需重新请求
+
+function resetSession() {
+  currentIdx = 0; correctCount = 0; wrongCount = 0;
+  answerStatus = []; topicCache = [];
+}
+function recomputeCounts() {
+  correctCount = 0; wrongCount = 0;
+  for (const s of answerStatus) {
+    if (!s) continue;
+    if (s.isCorrect) correctCount++; else wrongCount++;
+  }
+}
 
 const WRONG_KEY = 'anquan_wrong_questions_v1';
 function getWrongList() {
@@ -220,7 +249,7 @@ function render(html) {
 }
 
 function showHome() {
-  topicIds = []; wrongQueue = []; currentIdx = 0; correctCount = 0; wrongCount = 0;
+  topicIds = []; wrongQueue = []; resetSession();
   practiceMode = 'normal';
   const wrongCountTotal = getWrongList().length;
   let paperOptions = Object.entries(PAPERS).map(([id, name]) =>
@@ -261,7 +290,9 @@ function startWrongBook() {
   practiceMode = 'wrong';
   wrongQueue = list.slice();
   topicIds = wrongQueue.map(x => x._tid);
-  currentIdx = 0; correctCount = 0; wrongCount = 0;
+  resetSession();
+  // 错题本模式预填缓存（题目数据已经存在 localStorage 里）
+  topicCache = wrongQueue.map(x => ({ topic: x.topic, option: x.option }));
   loadQuestion();
 }
 
@@ -276,7 +307,7 @@ async function startRandom() {
   render('<div class="loading">加载题目中...</div>');
   const resp = await fetch('/api/topics?exerciseType=EXERCISE_TYPE_15&subjectId=19&total=15');
   topicIds = await resp.json();
-  currentIdx = 0; correctCount = 0; wrongCount = 0;
+  resetSession();
   loadQuestion();
 }
 
@@ -285,24 +316,30 @@ async function startPaper(paperId) {
   render('<div class="loading">加载题目中...</div>');
   const resp = await fetch(`/api/topics?exerciseType=EXERCISE_TYPE_PAPER&subjectId=19&total=200&paperId=${paperId}`);
   topicIds = await resp.json();
-  currentIdx = 0; correctCount = 0; wrongCount = 0;
+  resetSession();
   loadQuestion();
 }
 
 async function loadQuestion() {
   if (currentIdx >= topicIds.length) { showResult(); return; }
-  if (practiceMode === 'wrong') {
-    // 错题本模式：直接用本地缓存数据，无需请求后端
-    currentTopic = wrongQueue[currentIdx];
-    selectedAnswers = [];
+  selectedAnswers = [];
+  // 优先使用缓存（错题本模式或已访问过的题）
+  if (topicCache[currentIdx]) {
+    currentTopic = topicCache[currentIdx];
     renderQuestion();
     return;
   }
   render('<div class="loading">加载题目中...</div>');
   const resp = await fetch('/api/topic-info?topicId=' + topicIds[currentIdx]);
   currentTopic = await resp.json();
-  selectedAnswers = [];
+  topicCache[currentIdx] = currentTopic;
   renderQuestion();
+}
+
+function jumpTo(idx) {
+  if (idx < 0 || idx >= topicIds.length) return;
+  currentIdx = idx;
+  loadQuestion();
 }
 
 function renderQuestion() {
@@ -342,12 +379,29 @@ function renderQuestion() {
   const multiHint = isMulti ? '<div class="multi-hint">（多选题，请选择所有正确答案，然后点击"确认提交"）</div>' : '';
   const multiBtn = isMulti ? '<button class="submit-multi" id="submitMultiBtn" onclick="submitMulti()">确认提交</button>' : '';
 
+  // 题号网格
+  let gridHtml = '';
+  for (let i = 0; i < total; i++) {
+    let cls = 'nav-cell';
+    const s = answerStatus[i];
+    if (s) cls += s.isCorrect ? ' correct' : ' wrong';
+    if (i === currentIdx) cls += ' current';
+    gridHtml += `<div class="${cls}" onclick="jumpTo(${i})">${i+1}</div>`;
+  }
+
   render(`
     <div class="card">
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       <div class="progress-text">
         <span>第 ${currentIdx+1} / ${total} 题</span>
         <span class="score-badge">✓ ${correctCount} &nbsp; ✗ ${wrongCount}</span>
+      </div>
+      <div class="nav-toggle" onclick="toggleNav()" id="navToggle">▲ 收起题号导航</div>
+      <div id="navGrid" style="display:block"><div class="nav-grid">${gridHtml}</div>
+        <div style="margin-top:10px; text-align:right;">
+          <button class="redo-btn" onclick="showResult()">查看本次成绩</button>
+          <button class="restart-btn" style="padding:8px 14px; font-size:13px; margin-left:6px;" onclick="showHome()">返回首页</button>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -366,6 +420,42 @@ function renderQuestion() {
       </button>
     </div>
   `);
+
+  // 如果这题已答过，重放结果（锁定状态）
+  if (answerStatus[currentIdx]) {
+    replayAnswer();
+  }
+}
+
+function toggleNav() {
+  const grid = document.getElementById('navGrid');
+  const tog = document.getElementById('navToggle');
+  if (!grid || !tog) return;
+  if (grid.style.display === 'none') {
+    grid.style.display = 'block';
+    tog.textContent = '▲ 收起题号导航';
+  } else {
+    grid.style.display = 'none';
+    tog.textContent = '▼ 展开题号导航';
+  }
+}
+
+function replayAnswer() {
+  const s = answerStatus[currentIdx];
+  if (!s) return;
+  showResultUI(s.userAnswer, s.isCorrect);
+  // 加一个"重答此题"按钮
+  const resultBox = document.getElementById('resultBox');
+  if (resultBox) {
+    resultBox.innerHTML += `<br><button class="redo-btn" onclick="redoCurrent()">重答此题</button>`;
+  }
+}
+
+function redoCurrent() {
+  answerStatus[currentIdx] = undefined;
+  recomputeCounts();
+  selectedAnswers = [];
+  renderQuestion();
 }
 
 function selectOption(no) {
@@ -406,30 +496,40 @@ function submitMulti() {
 
 function checkAnswer(userAnswer) {
   const t = currentTopic.topic;
-  const opts = currentTopic.option || [];
-  const correctAnswer = t.answer; // e.g. "C" or "AB"
-  const isTF = t.topicType === 'TOPIC_TYPE_TRUEFALSE';
-  const isMulti = t.topicType === 'TOPIC_TYPE_MULTI';
-
-  // Normalize answers for comparison
+  const correctAnswer = t.answer;
   const userSorted = userAnswer.split('').sort().join('');
   const correctSorted = correctAnswer.split('').sort().join('');
   const isCorrect = userSorted === correctSorted;
 
+  // 记录答题状态
+  answerStatus[currentIdx] = { userAnswer, isCorrect };
+  recomputeCounts();
+
   const curTid = topicIds[currentIdx];
   if (isCorrect) {
-    correctCount++;
-    // 错题本模式：答对了自动从错题本移除
-    if (practiceMode === 'wrong') {
-      removeWrong(curTid);
-    }
+    if (practiceMode === 'wrong') removeWrong(curTid);
   } else {
-    wrongCount++;
-    // 普通模式：答错的题加入错题本
-    if (practiceMode === 'normal') {
-      addWrong(currentTopic, curTid);
-    }
+    if (practiceMode === 'normal') addWrong(currentTopic, curTid);
   }
+
+  showResultUI(userAnswer, isCorrect);
+
+  // 更新顶部进度网格中当前格子的颜色
+  const cell = document.querySelectorAll('.nav-cell')[currentIdx];
+  if (cell) {
+    cell.classList.remove('correct', 'wrong');
+    cell.classList.add(isCorrect ? 'correct' : 'wrong');
+  }
+  // 更新分数
+  const badge = document.querySelector('.score-badge');
+  if (badge) badge.innerHTML = `✓ ${correctCount} &nbsp; ✗ ${wrongCount}`;
+}
+
+function showResultUI(userAnswer, isCorrect) {
+  const t = currentTopic.topic;
+  const opts = currentTopic.option || [];
+  const correctAnswer = t.answer;
+  const isTF = t.topicType === 'TOPIC_TYPE_TRUEFALSE';
 
   // Disable all options
   if (isTF) {
