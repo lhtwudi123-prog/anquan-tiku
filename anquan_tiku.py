@@ -371,13 +371,13 @@ function renderQuestion() {
 
   const typeMap = {
     'TOPIC_TYPE_RADIO': '单选题',
-    'TOPIC_TYPE_MULTI': '多选题',
+    'TOPIC_TYPE_MULTIPLE': '多选题',
     'TOPIC_TYPE_TRUEFALSE': '判断题',
     'TOPIC_TYPE_ANSWER': '简答题',
     'TOPIC_TYPE_FILLING': '填空题',
   };
   const typeName = typeMap[t.topicType] || t.topicType;
-  const isMulti = t.topicType === 'TOPIC_TYPE_MULTI';
+  const isMulti = t.topicType === 'TOPIC_TYPE_MULTIPLE';
   const isTF = t.topicType === 'TOPIC_TYPE_TRUEFALSE';
 
   let optionsHtml = '';
@@ -479,7 +479,7 @@ function redoCurrent() {
 
 function selectOption(no) {
   const t = currentTopic.topic;
-  const isMulti = t.topicType === 'TOPIC_TYPE_MULTI';
+  const isMulti = t.topicType === 'TOPIC_TYPE_MULTIPLE';
 
   if (document.getElementById('opt-' + no).classList.contains('disabled')) return;
 
