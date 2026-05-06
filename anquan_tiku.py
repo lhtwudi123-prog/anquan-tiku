@@ -132,9 +132,10 @@ h2 { font-size: 17px; margin-bottom: 16px; color: #1a6fc4; }
 .tf-btn.disabled { cursor: not-allowed; }
 
 /* 多选提交按钮 */
-.submit-multi { display: none; margin-top: 14px; padding: 10px 24px; background: #1a6fc4; color: #fff;
-  border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
-.submit-multi:hover { background: #155fa0; }
+.submit-multi { display: inline-block; margin-top: 14px; padding: 10px 24px; background: #b0bec5; color: #fff;
+  border: none; border-radius: 8px; font-size: 15px; cursor: not-allowed; transition: all .2s; }
+.submit-multi.active { background: #1a6fc4; cursor: pointer; }
+.submit-multi.active:hover { background: #155fa0; }
 
 /* 结果提示 */
 .result-box { display: none; margin-top: 16px; padding: 14px 16px; border-radius: 8px; font-size: 15px; }
@@ -396,8 +397,8 @@ function renderQuestion() {
       `</div>`;
   }
 
-  const multiHint = isMulti ? '<div class="multi-hint">（多选题，请选择所有正确答案，然后点击"确认提交"）</div>' : '';
-  const multiBtn = isMulti ? '<button class="submit-multi" id="submitMultiBtn" onclick="submitMulti()">确认提交</button>' : '';
+  const multiHint = isMulti ? '<div class="multi-hint">（多选题，请选择所有正确答案，至少选 2 项，然后点击"确认提交"查看答案）</div>' : '';
+  const multiBtn = isMulti ? '<button class="submit-multi" id="submitMultiBtn" onclick="submitMulti()">确认提交（已选 0 项）</button>' : '';
 
   // 题号网格
   let gridHtml = '';
@@ -492,9 +493,16 @@ function selectOption(no) {
       selectedAnswers.splice(idx, 1);
       el.classList.remove('selected');
     }
-    // Show submit button when at least one selected
+    // 更新提交按钮状态：至少选 2 项才能点击
     const btn = document.getElementById('submitMultiBtn');
-    if (btn) btn.style.display = selectedAnswers.length > 0 ? 'inline-block' : 'none';
+    if (btn) {
+      btn.textContent = `确认提交（已选 ${selectedAnswers.length} 项）`;
+      if (selectedAnswers.length >= 2) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
   } else {
     // Single select - answer immediately
     checkAnswer(no);
@@ -507,7 +515,10 @@ function selectTF(no) {
 }
 
 function submitMulti() {
-  if (selectedAnswers.length === 0) return;
+  if (selectedAnswers.length < 2) {
+    alert('多选题至少需要选择 2 项');
+    return;
+  }
   const userAnswer = selectedAnswers.slice().sort().join('');
   checkAnswer(userAnswer);
 }
