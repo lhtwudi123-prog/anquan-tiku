@@ -13,8 +13,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 REAL_HOST = "http://px.hebsjx.org.cn"
 
-# 所有试卷列表 (ID -> 名称)
-PAPERS = {
+# 试卷列表硬编码回退(官方源不可用时使用)
+FALLBACK_PAPERS = {
     36: "考核模拟（新）——单选题（1）",
     37: "考核模拟（新）——单选题（2）",
     38: "考核模拟（新）——单选题（3）",
@@ -35,7 +35,35 @@ PAPERS = {
     55: "考核模拟（新）——判断题（4）",
     56: "考核模拟（新）——判断题（5）",
     57: "考核模拟（新）——判断题（6）",
+    58: "考核模拟（新）——判断题（7）",
+    59: "考核模拟（新）——判断题（8）",
 }
+
+
+def fetch_papers_from_upstream(subject_id=19):
+    """从官方页面动态拉取最新试卷列表,失败返回 None"""
+    url = f"{REAL_HOST}/tikuIndex/examToTikuIndex?subjectId={subject_id}"
+    try:
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "Mozilla/5.0")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+        # 描述在前,按钮 data-id 在后
+        pattern = re.compile(r'parperDescr">([^<]+)</em>.*?data-id=(\d+)', re.S)
+        papers = {int(pid): desc.strip() for desc, pid in pattern.findall(html)}
+        return papers if papers else None
+    except Exception as e:
+        print(f"⚠️  拉取官方试卷列表失败,使用本地回退: {e}")
+        return None
+
+
+_upstream = fetch_papers_from_upstream()
+if _upstream:
+    PAPERS = _upstream
+    print(f"✅ 已从官方同步 {len(PAPERS)} 套试卷")
+else:
+    PAPERS = FALLBACK_PAPERS
+    print(f"⚠️  使用本地硬编码 {len(PAPERS)} 套试卷")
 
 
 def proxy_post(path, params):
